@@ -4,13 +4,14 @@ services:
   habitflow:
     build: .
     container_name: habitflow
+    user: "1000:1000"
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - DB_PATH=/app/data/habits.db
     volumes:
-      - habitflow_data:/app/data
+      - ./habitflow_data:/app/data
     restart: unless-stopped
 
 volumes:
