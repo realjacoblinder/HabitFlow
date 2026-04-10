@@ -10,9 +10,9 @@ services:
     environment:
       - NODE_ENV=production
       - DB_PATH=/app/data/habits.db
+      - TZ=${TZ:-America/New_York}
     volumes:
       - ./habitflow_data:/app/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     restart: unless-stopped
-
-volumes:
-  habitflow_data:
