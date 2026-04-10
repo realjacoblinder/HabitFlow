@@ -151,7 +151,7 @@ export default function App() {
               updateCategory={updateCategory}
               deleteCategory={deleteCategory}
             />
-            <HabitForm categories={categories} addHabit={addHabit} />
+            <HabitForm categories={categories} addHabit={addHabit} addCategory={addCategory} />
           </div>
         </div>
       </header>

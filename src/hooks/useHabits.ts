@@ -98,10 +98,11 @@ export function useHabits(userId: string | null) {
       color,
     };
     setCategories([...categories, newCategory]);
-    await apiFetch('/api/categories', userId, {
+    apiFetch('/api/categories', userId, {
       method: 'POST',
       body: JSON.stringify(newCategory),
-    });
+    }).catch(e => console.error("Failed to add category:", e));
+    return newCategory.id;
   };
 
   const updateCategory = async (id: string, updates: Partial<Category>) => {

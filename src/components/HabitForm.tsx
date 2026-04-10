@@ -10,15 +10,20 @@ import { Plus } from 'lucide-react';
 interface HabitFormProps {
   categories: Category[];
   addHabit: (name: string, frequency: 'daily' | 'weekly' | 'monthly', description?: string, categoryId?: string, reminderTime?: string) => void;
+  addCategory?: (name: string, color: string) => Promise<string | undefined> | undefined;
 }
 
-export function HabitForm({ categories, addHabit }: HabitFormProps) {
+export function HabitForm({ categories, addHabit, addCategory }: HabitFormProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState<string>('none');
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [reminderTime, setReminderTime] = useState('');
+  
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryColor, setNewCategoryColor] = useState('#3b82f6');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +34,8 @@ export function HabitForm({ categories, addHabit }: HabitFormProps) {
       setCategoryId('none');
       setFrequency('daily');
       setReminderTime('');
+      setIsCreatingCategory(false);
+      setNewCategoryName('');
       setIsOpen(false);
     }
   };
@@ -77,7 +84,15 @@ export function HabitForm({ categories, addHabit }: HabitFormProps) {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="category">Category</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
+            <Select value={categoryId} onValueChange={(val) => {
+              if (val === 'new') {
+                setIsCreatingCategory(true);
+                setCategoryId('none');
+              } else {
+                setIsCreatingCategory(false);
+                setCategoryId(val);
+              }
+            }}>
               <SelectTrigger>
                 <SelectValue>
                   {categoryId === 'none' ? 'No Category' : categories.find(c => c.id === categoryId)?.name || 'Select a category'}
@@ -93,8 +108,41 @@ export function HabitForm({ categories, addHabit }: HabitFormProps) {
                     </div>
                   </SelectItem>
                 ))}
+                {addCategory && (
+                  <SelectItem value="new" className="text-primary font-medium border-t mt-1 pt-1">
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create New Category...
+                    </div>
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
+            {isCreatingCategory && (
+              <div className="flex flex-col gap-2 mt-2 p-3 bg-muted/50 border rounded-md">
+                <Label className="text-xs font-semibold">New Category Details</Label>
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 flex flex-col gap-2">
+                    <Input 
+                      value={newCategoryName} 
+                      onChange={e => setNewCategoryName(e.target.value)} 
+                      placeholder="Category name"
+                      autoFocus
+                    />
+                  </div>
+                  <Button type="button" size="sm" onClick={async () => {
+                    if (newCategoryName.trim() && addCategory) {
+                      const newId = await addCategory(newCategoryName.trim(), newCategoryColor);
+                      if (newId) {
+                        setCategoryId(newId);
+                        setIsCreatingCategory(false);
+                        setNewCategoryName('');
+                      }
+                    }
+                  }}>Add</Button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="reminder-time">Reminder Time (Optional)</Label>
