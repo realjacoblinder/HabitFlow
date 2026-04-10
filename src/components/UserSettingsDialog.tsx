@@ -14,6 +14,7 @@ interface UserSettingsDialogProps {
 export function UserSettingsDialog({ user, updateUser }: UserSettingsDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [ntfyTopic, setNtfyTopic] = useState(user.ntfyTopic || '');
+  const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -25,6 +26,28 @@ export function UserSettingsDialog({ user, updateUser }: UserSettingsDialogProps
     e.preventDefault();
     updateUser(user.id, { ntfyTopic: ntfyTopic.trim() || undefined });
     setIsOpen(false);
+  };
+
+  const handleTestNotification = async () => {
+    setIsTesting(true);
+    try {
+      const res = await fetch('/api/test-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id
+        }
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to send test notification');
+      }
+      alert('Test notification sent successfully!');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   return (
@@ -49,7 +72,12 @@ export function UserSettingsDialog({ user, updateUser }: UserSettingsDialogProps
               We will send HTTP POST requests to https://ntfy.sh/&lt;topic&gt; for your habit reminders.
             </p>
           </div>
-          <Button type="submit" className="mt-4">Save Settings</Button>
+          <div className="flex gap-2 mt-4">
+            <Button type="button" variant="secondary" className="flex-1" onClick={handleTestNotification} disabled={isTesting || !user.ntfyTopic}>
+              {isTesting ? 'Sending...' : 'Test Notification'}
+            </Button>
+            <Button type="submit" className="flex-1">Save Settings</Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

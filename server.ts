@@ -78,6 +78,30 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  app.post('/api/test-notification', (req, res) => {
+    const userId = res.locals.userId;
+    const user = db.prepare('SELECT ntfyTopic FROM users WHERE id = ?').get(userId) as { ntfyTopic: string | null } | undefined;
+
+    if (!user || !user.ntfyTopic) {
+      return res.status(400).json({ error: 'No NTFY topic configured for this user.' });
+    }
+
+    fetch(`https://ntfy.sh/${user.ntfyTopic}`, {
+      method: 'POST',
+      body: 'This is a test notification from HabitFlow!',
+      headers: {
+        'Title': 'Test Notification',
+        'Tags': 'tada,bell'
+      }
+    }).then(ntfyRes => {
+      if (!ntfyRes.ok) throw new Error('NTFY responded with ' + ntfyRes.status);
+      res.json({ success: true });
+    }).catch(err => {
+      console.error('Test notification failed:', err);
+      res.status(500).json({ error: 'Failed to send notification.' });
+    });
+  });
+
   // API Routes
   app.get('/api/data', (req, res) => {
     const userId = res.locals.userId;
