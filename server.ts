@@ -3,12 +3,23 @@ import { createServer as createViteServer } from 'vite';
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import pino from 'pino';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
+const logger = pino({
+  transport: process.env.NODE_ENV !== 'production' ? {
+    target: 'pino-pretty'
+  } : undefined,
+  level: process.env.LOG_LEVEL || 'info',
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbPath = process.env.DB_PATH || 'habits.db';
 const db = new Database(dbPath);
+db.pragma('journal_mode = WAL');
 
 // Initialize DB
 db.exec(`
@@ -48,7 +59,24 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(helmet());
   app.use(express.json());
+
+  app.use('/api/', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 100,
+    message: { error: 'Too many requests, please try again later.' },
+  }));
+
+  app.get('/api/health', (req, res) => {
+    try {
+      db.prepare('SELECT 1').get();
+      res.status(200).send('OK');
+    } catch(e) {
+      logger.error({ err: e }, 'Healthcheck failed');
+      res.status(500).send('Database Error');
+    }
+  });
 
   // Middleware to extract userId
   app.use((req, res, next) => {
@@ -97,7 +125,7 @@ async function startServer() {
       if (!ntfyRes.ok) throw new Error('NTFY responded with ' + ntfyRes.status);
       res.json({ success: true });
     }).catch(err => {
-      console.error('Test notification failed:', err);
+      logger.error({ err }, 'Test notification failed');
       res.status(500).json({ error: 'Failed to send notification.' });
     });
   });
@@ -188,13 +216,24 @@ async function startServer() {
               'Title': 'HabitFlow Reminder',
               'Tags': 'bell'
             }
-          }).catch(err => console.error('Failed to send ntfy reminder', err));
+          }).catch(err => logger.error({ err }, 'Failed to send ntfy reminder'));
         }
       } catch (err) {
-        console.error('Error checking reminders', err);
+        logger.error({ err }, 'Error checking reminders');
       }
     }
   }, 10000);
+
+  // Background job for SQLite backups
+  setInterval(async () => {
+    try {
+      logger.info('Starting daily database backup...');
+      await db.backup(path.join(path.dirname(dbPath), 'backup.db'));
+      logger.info('Database backup completed successfully');
+    } catch (err) {
+      logger.error({ err }, 'Database backup failed');
+    }
+  }, 24 * 60 * 60 * 1000);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
@@ -212,7 +251,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    logger.info(`Server running on http://localhost:${PORT}`);
   });
 }
 
