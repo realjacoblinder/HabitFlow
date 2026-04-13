@@ -8,6 +8,24 @@ import { Trash2, CheckCircle2, Circle, Flame, Trophy, Star, Bell, Plus, Check, C
 import { Badge } from './ui/badge';
 import { EditHabitDialog } from './EditHabitDialog';
 import { HabitCalendarDialog } from './HabitCalendarDialog';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 
 interface HabitListProps {
   habits: Habit[];
@@ -69,6 +87,27 @@ export function HabitList({ habits, categories, records, toggleHabitRecord, upda
     [newHabits[index], newHabits[targetIndex]] = [newHabits[targetIndex], newHabits[index]];
     
     reorderHabits(newHabits);
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = sortedHabits.findIndex((h) => h.id === active.id);
+      const newIndex = sortedHabits.findIndex((h) => h.id === over.id);
+      const reordered = arrayMove(sortedHabits, oldIndex, newIndex);
+      reorderHabits(reordered);
+    }
   };
 
 
@@ -222,258 +261,411 @@ export function HabitList({ habits, categories, records, toggleHabitRecord, upda
     );
   }
 
+  const isManualMode = sortMode === 'manual' && !selectedCategoryId && !selectedFrequency;
+
   return (
-    <div className="space-y-4 pb-8">
-      {sortedHabits.map((habit, index) => {
-        const category = getCategory(habit.categoryId);
-        const streak = calculateStreak(habit);
-        const longestStreak = calculateLongestStreak(habit);
-        
-        let hitsThisMonth = 0;
-        if (habit.frequency === 'monthly') {
-          const habitRecords = records.filter(r => r.habitId === habit.id && r.completed);
-          hitsThisMonth = habitRecords.filter(r => {
-            const [y, m, d] = r.date.split('-');
-            const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-            return isSameMonth(dateObj, today);
-          }).length;
-        }
-        
-        let streakBadgeClass = "bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400";
-        let StreakIcon = Flame;
-        
-        if (streak >= 30) {
-          streakBadgeClass = "bg-purple-100 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400 border-purple-300 dark:border-purple-700 shadow-[0_0_10px_rgba(168,85,247,0.4)]";
-          StreakIcon = Trophy;
-        } else if (streak >= 7) {
-          streakBadgeClass = "bg-yellow-100 text-yellow-700 hover:bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700 shadow-[0_0_10px_rgba(234,179,8,0.4)]";
-          StreakIcon = Star;
-        }
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+      modifiers={[restrictToVerticalAxis]}
+    >
+      <SortableContext
+        items={sortedHabits.map((h) => h.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="space-y-4 pb-8">
+          {sortedHabits.map((habit, index) => (
+            <SortableHabitItem
+              key={habit.id}
+              habit={habit}
+              index={index}
+              total={sortedHabits.length}
+              category={getCategory(habit.categoryId)}
+              categories={categories}
+              records={records}
+              streak={calculateStreak(habit)}
+              longestStreak={calculateLongestStreak(habit)}
+              today={today}
+              days={days}
+              toggleHabitRecord={toggleHabitRecord}
+              updateHabit={updateHabit}
+              deleteHabit={deleteHabit}
+              isManualMode={isManualMode}
+              moveHabit={moveHabit}
+              getRecord={getRecord}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
 
-        return (
-          <Card key={habit.id} className={`overflow-hidden transition-all duration-300 ${streak >= 30 ? 'border-purple-200 dark:border-purple-800' : streak >= 7 ? 'border-yellow-200 dark:border-yellow-800' : ''}`}>
-            <div className="flex flex-col sm:flex-row">
-              <div className="flex-1 p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-lg">{habit.name}</h3>
-                      {category && (
-                        <Badge variant="outline" style={{ borderColor: category.color, color: category.color }}>
-                          {category.name}
-                        </Badge>
-                      )}
-                      <Badge variant="secondary" className="capitalize">
-                        {habit.frequency || 'daily'}
-                      </Badge>
-                      {habit.reminderTime && (
-                        <Badge variant="secondary" className="text-muted-foreground">
-                          <Bell className="w-3 h-3 mr-1" />
-                          {habit.reminderTime}
-                        </Badge>
-                      )}
-                      {habit.frequency === 'monthly' && (
-                        <Badge variant="outline" className="text-muted-foreground transition-all duration-300 bg-muted/20">
-                          {hitsThisMonth} hits this month
-                        </Badge>
-                      )}
-                    </div>
-                    {habit.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{habit.description}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {sortMode === 'manual' && !selectedCategoryId && !selectedFrequency && (
-                      <div className="flex items-center mr-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={index === 0}
-                          onClick={() => moveHabit(habit.id, 'up')}
-                          className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-30"
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={index === sortedHabits.length - 1}
-                          onClick={() => moveHabit(habit.id, 'down')}
-                          className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-30"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                    <HabitCalendarDialog habit={habit} records={records} toggleHabitRecord={toggleHabitRecord} category={category} isHeatmap={habit.frequency === 'monthly'} />
-                    <EditHabitDialog habit={habit} categories={categories} updateHabit={updateHabit} />
-                    <Button variant="ghost" size="icon" onClick={() => deleteHabit(habit.id)} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+interface SortableHabitItemProps {
+  habit: Habit;
+  index: number;
+  total: number;
+  category?: Category;
+  categories: Category[];
+  records: HabitRecord[];
+  streak: number;
+  longestStreak: number;
+  today: Date;
+  days: Date[];
+  toggleHabitRecord: (habitId: string, date: Date) => void;
+  updateHabit: (id: string, updates: Partial<Habit>) => void;
+  deleteHabit: (habitId: string) => void;
+  isManualMode: boolean;
+  moveHabit: (id: string, direction: 'up' | 'down') => void;
+  getRecord: (habitId: string, date: Date) => HabitRecord | undefined;
+}
+
+function SortableHabitItem({
+  habit,
+  index,
+  total,
+  category,
+  categories,
+  records,
+  streak,
+  longestStreak,
+  today,
+  days,
+  toggleHabitRecord,
+  updateHabit,
+  deleteHabit,
+  isManualMode,
+  moveHabit,
+  getRecord,
+}: SortableHabitItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: habit.id, disabled: !isManualMode });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.8 : undefined,
+  };
+
+  let hitsThisMonth = 0;
+  if (habit.frequency === 'monthly') {
+    const habitRecords = records.filter((r) => r.habitId === habit.id && r.completed);
+    hitsThisMonth = habitRecords.filter((r) => {
+      const [y, m, d] = r.date.split('-');
+      const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+      return isSameMonth(dateObj, today);
+    }).length;
+  }
+
+  let streakBadgeClass =
+    "bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400";
+  let StreakIcon = Flame;
+
+  if (streak >= 30) {
+    streakBadgeClass =
+      "bg-purple-100 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400 border-purple-300 dark:border-purple-700 shadow-[0_0_10px_rgba(168,85,247,0.4)]";
+    StreakIcon = Trophy;
+  } else if (streak >= 7) {
+    streakBadgeClass =
+      "bg-yellow-100 text-yellow-700 hover:bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700 shadow-[0_0_10px_rgba(234,179,8,0.4)]";
+    StreakIcon = Star;
+  }
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className={`overflow-hidden transition-all duration-300 ${
+        streak >= 30
+          ? 'border-purple-200 dark:border-purple-800'
+          : streak >= 7
+          ? 'border-yellow-200 dark:border-yellow-800'
+          : ''
+      } ${isDragging ? 'shadow-2xl ring-2 ring-primary ring-offset-2' : ''}`}
+    >
+      <div className="flex flex-col sm:flex-row">
+        <div className="flex-1 p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3">
+              {isManualMode && (
+                <div
+                  {...attributes}
+                  {...listeners}
+                  className="mt-1 cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  <GripVertical className="h-5 w-5" />
                 </div>
-              </div>
-              
-              <div className="bg-muted/50 p-4 flex items-center justify-between sm:justify-end gap-2 sm:gap-4 border-t sm:border-t-0 sm:border-l min-w-[200px]">
-                {habit.frequency !== 'daily' && habit.frequencyTarget ? (
-                  (() => {
-                    const habitRecords = records.filter(r => r.habitId === habit.id && r.completed);
-                    const completedCount = habitRecords.filter(r => {
-                      const [y, m, d] = r.date.split('-');
-                      const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-                      return habit.frequency === 'weekly' ? isSameWeek(dateObj, today, { weekStartsOn: 1 }) : isSameMonth(dateObj, today);
-                    }).length;
-                    
-                    const isTodayLogged = getRecord(habit.id, today)?.completed;
-                    
-                    // Ring Math
-                    const radius = 24;
-                    const stroke = 4;
-                    const normalizedRadius = radius - stroke * 2;
-                    const circumference = normalizedRadius * 2 * Math.PI;
-                    const percentage = Math.min((completedCount / habit.frequencyTarget) * 100, 100);
-                    const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
-                    // Days Left Math
-                    const targetDate = habit.frequency === 'weekly' 
-                      ? endOfWeek(today, { weekStartsOn: 1 }) 
-                      : endOfMonth(today);
-                    // Add 1 because differenceInDays floors to midnight. So today against endOfWeek(today) evaluates cleanly.
-                    const daysLeft = differenceInDays(targetDate, today) + 1;
-                    
-                    let daysLeftColor = 'text-green-600 dark:text-green-400';
-                    if (daysLeft <= 3 && percentage < 100) daysLeftColor = 'text-amber-500';
-                    if (daysLeft === 1 && percentage < 100) daysLeftColor = 'text-red-500 animate-pulse';
-                    if (percentage >= 100) daysLeftColor = 'text-muted-foreground';
-
-                    const streakStatsBox = (
-                      <div className="flex flex-col items-center justify-center sm:border-r sm:pr-4 sm:mr-2">
-                        <div className={`flex flex-col items-center justify-center ${streak > 0 ? streakBadgeClass : 'bg-muted/30 text-muted-foreground'} min-w-[60px] p-2 rounded-lg transition-all`}>
-                          <StreakIcon className={`w-5 h-5 ${streak > 0 ? '' : 'opacity-30'}`} />
-                          <span className="text-xl font-bold leading-tight mt-0.5">{streak}</span>
-                          <span className="text-[9px] uppercase font-bold tracking-tighter opacity-70">
-                            {habit.frequency === 'weekly' ? (streak === 1 ? 'Week' : 'Weeks') : habit.frequency === 'monthly' ? (streak === 1 ? 'Month' : 'Months') : (streak === 1 ? 'Day' : 'Days')}
-                          </span>
-                        </div>
-                        {longestStreak > 0 && (
-                          <div className="flex items-center gap-1 mt-1 text-muted-foreground/60 whitespace-nowrap">
-                            <Trophy className="w-2.5 h-2.5" />
-                            <span className="text-[10px] font-medium">Best: {longestStreak}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-
-                    return (
-                      <div className="flex flex-row items-center justify-center gap-4 w-full sm:w-auto">
-                        {streakStatsBox}
-                        
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="flex items-center gap-4">
-                            <div className="relative flex items-center justify-center">
-                              <svg height={radius * 2} width={radius * 2} className="-rotate-90">
-                                <circle
-                                  stroke="currentColor"
-                                  fill="transparent"
-                                  strokeWidth={stroke}
-                                  r={normalizedRadius}
-                                  cx={radius}
-                                  cy={radius}
-                                  className="text-muted-foreground/20"
-                                />
-                                <circle
-                                  stroke="currentColor"
-                                  fill="transparent"
-                                  strokeWidth={stroke}
-                                  strokeDasharray={circumference + ' ' + circumference}
-                                  style={{ strokeDashoffset }}
-                                  strokeLinecap="round"
-                                  r={normalizedRadius}
-                                  cx={radius}
-                                  cy={radius}
-                                  className={`${percentage >= 100 ? 'text-primary' : category?.color ? '' : 'text-primary'} transition-all duration-1000 ease-in-out`}
-                                  {...(category?.color && percentage < 100 ? { stroke: category.color } : {})}
-                                />
-                              </svg>
-                              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-[13px] font-bold leading-none translate-y-[2px]">{completedCount}</span>
-                                <span className="text-[9px] text-muted-foreground leading-none border-t border-muted/50 pt-[1px] mt-[1px]">{habit.frequencyTarget}</span>
-                              </div>
-                            </div>
-
-                            <button
-                              onClick={() => toggleHabitRecord(habit.id, today)}
-                              className={`flex items-center justify-center w-10 h-10 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:scale-105 active:scale-95 ${
-                                isTodayLogged 
-                                  ? 'bg-primary/20 text-primary' 
-                                  : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
-                              }`}
-                              title={isTodayLogged ? "Un-mark today" : "Mark today"}
-                            >
-                              {isTodayLogged ? <Check className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-                            </button>
-                          </div>
-                          
-                          <div className="flex items-center">
-                             <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted/60 ${daysLeftColor}`}>
-                               {percentage >= 100 ? 'Goal Met!' : `${daysLeft} Day${daysLeft !== 1 ? 's' : ''} Left`}
-                             </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <div className="flex flex-row items-center gap-4">
-                    <div className="flex flex-col items-center justify-center border-r pr-4 mr-2">
-                      <div className={`flex flex-col items-center justify-center ${streak > 0 ? streakBadgeClass : 'bg-muted/30 text-muted-foreground'} min-w-[60px] p-2 rounded-lg transition-all`}>
-                        <StreakIcon className={`w-5 h-5 ${streak > 0 ? '' : 'opacity-30'}`} />
-                        <span className="text-xl font-bold leading-tight mt-0.5">{streak}</span>
-                        <span className="text-[9px] uppercase font-bold tracking-tighter opacity-70">Days</span>
-                      </div>
-                      {longestStreak > 0 && (
-                        <div className="flex items-center gap-1 mt-1 text-muted-foreground/60 whitespace-nowrap">
-                          <Trophy className="w-2.5 h-2.5" />
-                          <span className="text-[10px] font-medium">Best: {longestStreak}</span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2 sm:gap-4">
-                      {days.map((day) => {
-                        const record = getRecord(habit.id, day);
-                        const isToday = isSameDay(day, today);
-                        
-                        return (
-                          <div key={day.toISOString()} className="flex flex-col items-center gap-2">
-                            <span className={`text-xs ${isToday ? 'font-bold text-primary' : 'text-muted-foreground'}`}>
-                              {format(day, 'EEE')}
-                            </span>
-                            <button
-                              onClick={() => toggleHabitRecord(habit.id, day)}
-                              className={`rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                                record?.completed 
-                                  ? 'text-primary hover:text-primary/80' 
-                                  : 'text-muted hover:text-muted-foreground'
-                              }`}
-                            >
-                              {record?.completed ? (
-                                <CheckCircle2 className="h-6 w-6" />
-                              ) : (
-                                <Circle className="h-6 w-6" />
-                              )}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+              )}
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg">{habit.name}</h3>
+                  {category && (
+                    <Badge
+                      variant="outline"
+                      style={{ borderColor: category.color, color: category.color }}
+                    >
+                      {category.name}
+                    </Badge>
+                  )}
+                  <Badge variant="secondary" className="capitalize">
+                    {habit.frequency || 'daily'}
+                  </Badge>
+                  {habit.reminderTime && (
+                    <Badge variant="secondary" className="text-muted-foreground">
+                      <Bell className="w-3 h-3 mr-1" />
+                      {habit.reminderTime}
+                    </Badge>
+                  )}
+                  {habit.frequency === 'monthly' && (
+                    <Badge
+                      variant="outline"
+                      className="text-muted-foreground transition-all duration-300 bg-muted/20"
+                    >
+                      {hitsThisMonth} hits this month
+                    </Badge>
+                  )}
+                </div>
+                {habit.description && (
+                  <p className="text-sm text-muted-foreground mt-1">{habit.description}</p>
                 )}
               </div>
             </div>
-          </Card>
-        );
-      })}
-    </div>
+            <div className="flex items-center gap-1">
+              {isManualMode && (
+                <div className="flex items-center mr-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={index === 0}
+                    onClick={() => moveHabit(habit.id, 'up')}
+                    className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-30"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={index === total - 1}
+                    onClick={() => moveHabit(habit.id, 'down')}
+                    className="h-8 w-8 text-muted-foreground hover:text-primary disabled:opacity-30"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <HabitCalendarDialog
+                habit={habit}
+                records={records}
+                toggleHabitRecord={toggleHabitRecord}
+                category={category}
+                isHeatmap={habit.frequency === 'monthly'}
+              />
+              <EditHabitDialog habit={habit} updateHabit={updateHabit} categories={categories} />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => deleteHabit(habit.id)}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-muted/50 p-4 flex items-center justify-between sm:justify-end gap-2 sm:gap-4 border-t sm:border-t-0 sm:border-l min-w-[200px]">
+          {habit.frequency !== 'daily' && habit.frequencyTarget ? (
+            (() => {
+              const habitRecords = records.filter((r) => r.habitId === habit.id && r.completed);
+              const completedCount = habitRecords.filter((r) => {
+                const [y, m, d] = r.date.split('-');
+                const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                return habit.frequency === 'weekly'
+                  ? isSameWeek(dateObj, today, { weekStartsOn: 1 })
+                  : isSameMonth(dateObj, today);
+              }).length;
+
+              const isTodayLogged = getRecord(habit.id, today)?.completed;
+
+              // Ring Math
+              const radius = 24;
+              const stroke = 4;
+              const normalizedRadius = radius - stroke * 2;
+              const circumference = normalizedRadius * 2 * Math.PI;
+              const percentage = Math.min((completedCount / habit.frequencyTarget) * 100, 100);
+              const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
+              // Days Left Math
+              const targetDate =
+                habit.frequency === 'weekly' ? endOfWeek(today, { weekStartsOn: 1 }) : endOfMonth(today);
+              const daysLeft = differenceInDays(targetDate, today) + 1;
+
+              let daysLeftColor = 'text-green-600 dark:text-green-400';
+              if (daysLeft <= 3 && percentage < 100) daysLeftColor = 'text-amber-500';
+              if (daysLeft === 1 && percentage < 100) daysLeftColor = 'text-red-500 animate-pulse';
+              if (percentage >= 100) daysLeftColor = 'text-muted-foreground';
+
+              const streakStatsBox = (
+                <div className="flex flex-col items-center justify-center sm:border-r sm:pr-4 sm:mr-2">
+                  <div
+                    className={`flex flex-col items-center justify-center ${
+                      streak > 0 ? streakBadgeClass : 'bg-muted/30 text-muted-foreground'
+                    } min-w-[60px] p-2 rounded-lg transition-all`}
+                  >
+                    <StreakIcon className={`w-5 h-5 ${streak > 0 ? '' : 'opacity-30'}`} />
+                    <span className="text-xl font-bold leading-tight mt-0.5">{streak}</span>
+                    <span className="text-[9px] uppercase font-bold tracking-tighter opacity-70">
+                      {habit.frequency === 'weekly'
+                        ? streak === 1
+                          ? 'Week'
+                          : 'Weeks'
+                        : habit.frequency === 'monthly'
+                        ? streak === 1
+                          ? 'Month'
+                          : 'Months'
+                        : streak === 1
+                        ? 'Day'
+                        : 'Days'}
+                    </span>
+                  </div>
+                  {longestStreak > 0 && (
+                    <div className="flex items-center gap-1 mt-1 text-muted-foreground/60 whitespace-nowrap">
+                      <Trophy className="w-2.5 h-2.5" />
+                      <span className="text-[10px] font-medium">Best: {longestStreak}</span>
+                    </div>
+                  )}
+                </div>
+              );
+
+              return (
+                <div className="flex flex-row items-center justify-center gap-4 w-full sm:w-auto">
+                  {streakStatsBox}
+
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="flex items-center gap-4">
+                      <div className="relative flex items-center justify-center">
+                        <svg height={radius * 2} width={radius * 2} className="-rotate-90">
+                          <circle
+                            stroke="currentColor"
+                            fill="transparent"
+                            strokeWidth={stroke}
+                            r={normalizedRadius}
+                            cx={radius}
+                            cy={radius}
+                            className="text-muted-foreground/20"
+                          />
+                          <circle
+                            stroke="currentColor"
+                            fill="transparent"
+                            strokeWidth={stroke}
+                            strokeDasharray={circumference + ' ' + circumference}
+                            style={{ strokeDashoffset }}
+                            strokeLinecap="round"
+                            r={normalizedRadius}
+                            cx={radius}
+                            cy={radius}
+                            className={`${
+                              percentage >= 100 ? 'text-primary' : category?.color ? '' : 'text-primary'
+                            } transition-all duration-1000 ease-in-out`}
+                            {...(category?.color && percentage < 100 ? { stroke: category.color } : {})}
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-[13px] font-bold leading-none translate-y-[2px]">
+                            {completedCount}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground leading-none border-t border-muted/50 pt-[1px] mt-[1px]">
+                            {habit.frequencyTarget}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => toggleHabitRecord(habit.id, today)}
+                        className={`flex items-center justify-center w-10 h-10 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:scale-105 active:scale-95 ${
+                          isTodayLogged
+                            ? 'bg-primary/20 text-primary'
+                            : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                        }`}
+                        title={isTodayLogged ? "Un-mark today" : "Mark today"}
+                      >
+                        {isTodayLogged ? <Check className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center">
+                      <span
+                        className={`text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted/60 ${daysLeftColor}`}
+                      >
+                        {percentage >= 100 ? 'Goal Met!' : `${daysLeft} Day${daysLeft !== 1 ? 's' : ''} Left`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="flex flex-row items-center gap-4">
+              <div className="flex flex-col items-center justify-center border-r pr-4 mr-2">
+                <div
+                  className={`flex flex-col items-center justify-center ${
+                    streak > 0 ? streakBadgeClass : 'bg-muted/30 text-muted-foreground'
+                  } min-w-[60px] p-2 rounded-lg transition-all`}
+                >
+                  <StreakIcon className={`w-5 h-5 ${streak > 0 ? '' : 'opacity-30'}`} />
+                  <span className="text-xl font-bold leading-tight mt-0.5">{streak}</span>
+                  <span className="text-[9px] uppercase font-bold tracking-tighter opacity-70">Days</span>
+                </div>
+                {longestStreak > 0 && (
+                  <div className="flex items-center gap-1 mt-1 text-muted-foreground/60 whitespace-nowrap">
+                    <Trophy className="w-2.5 h-2.5" />
+                    <span className="text-[10px] font-medium">Best: {longestStreak}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-4">
+                {days.map((day) => {
+                  const record = getRecord(habit.id, day);
+                  const isToday = isSameDay(day, today);
+
+                  return (
+                    <div key={day.toISOString()} className="flex flex-col items-center gap-2">
+                      <span
+                        className={`text-xs ${isToday ? 'font-bold text-primary' : 'text-muted-foreground'}`}
+                      >
+                        {format(day, 'EEE')}
+                      </span>
+                      <button
+                        onClick={() => toggleHabitRecord(habit.id, day)}
+                        className={`rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                          record?.completed
+                            ? 'text-primary hover:text-primary/80'
+                            : 'text-muted hover:text-muted-foreground'
+                        }`}
+                      >
+                        {record?.completed ? (
+                          <CheckCircle2 className="h-6 w-6" />
+                        ) : (
+                          <Circle className="h-6 w-6" />
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }
