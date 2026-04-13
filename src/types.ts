@@ -20,6 +20,7 @@ export interface Habit {
   frequency?: HabitFrequency;
   createdAt: number;
   reminderTime?: string;
+  frequencyTarget?: number;
 }
 
 export interface HabitRecord {

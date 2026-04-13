@@ -47,9 +47,9 @@ db.exec(`
   );
 `);
 
-// Add new columns if they don't exist
 try { db.exec("ALTER TABLE users ADD COLUMN ntfyTopic TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE habits ADD COLUMN reminderTime TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE habits ADD COLUMN frequencyTarget INTEGER"); } catch (e) {}
 
 // Daily automated SQLite backup
 setInterval(async () => {
@@ -178,16 +178,16 @@ async function startServer() {
 
   // Habits
   app.post('/api/habits', (req, res) => {
-    const { id, name, description, categoryId, frequency, createdAt, reminderTime } = req.body;
-    db.prepare('INSERT INTO habits (id, userId, name, description, categoryId, frequency, createdAt, reminderTime) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-      id, res.locals.userId, name, description || null, categoryId || null, frequency || 'daily', createdAt, reminderTime || null
+    const { id, name, description, categoryId, frequency, createdAt, reminderTime, frequencyTarget } = req.body;
+    db.prepare('INSERT INTO habits (id, userId, name, description, categoryId, frequency, createdAt, reminderTime, frequencyTarget) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+      id, res.locals.userId, name, description || null, categoryId || null, frequency || 'daily', createdAt, reminderTime || null, frequencyTarget || null
     );
     res.json({ success: true });
   });
   app.put('/api/habits/:id', (req, res) => {
-    const { name, description, categoryId, frequency, reminderTime } = req.body;
-    db.prepare('UPDATE habits SET name = ?, description = ?, categoryId = ?, frequency = ?, reminderTime = ? WHERE id = ? AND userId = ?').run(
-      name, description || null, categoryId || null, frequency || 'daily', reminderTime || null, req.params.id, res.locals.userId
+    const { name, description, categoryId, frequency, reminderTime, frequencyTarget } = req.body;
+    db.prepare('UPDATE habits SET name = ?, description = ?, categoryId = ?, frequency = ?, reminderTime = ?, frequencyTarget = ? WHERE id = ? AND userId = ?').run(
+      name, description || null, categoryId || null, frequency || 'daily', reminderTime || null, frequencyTarget || null, req.params.id, res.locals.userId
     );
     res.json({ success: true });
   });

@@ -52,7 +52,7 @@ export function useHabits(userId: string | null) {
   }, [userId]);
 
   // Habit Actions
-  const addHabit = async (name: string, frequency: 'daily' | 'weekly' | 'monthly', description?: string, categoryId?: string, reminderTime?: string) => {
+  const addHabit = async (name: string, frequency: 'daily' | 'weekly' | 'monthly', description?: string, categoryId?: string, reminderTime?: string, frequencyTarget?: number) => {
     if (!userId) return;
     const newHabit: Habit = {
       id: uuidv4(),
@@ -60,6 +60,7 @@ export function useHabits(userId: string | null) {
       description,
       categoryId,
       frequency,
+      frequencyTarget,
       createdAt: Date.now(),
       reminderTime,
     };
