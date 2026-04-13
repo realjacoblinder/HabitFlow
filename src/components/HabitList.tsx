@@ -669,4 +669,3 @@ function SortableHabitItem({
     </Card>
   );
 }
-}
