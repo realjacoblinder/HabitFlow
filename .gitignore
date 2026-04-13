@@ -7,6 +7,9 @@ coverage/
 .env*
 !.env.example
 
+# local dev testing
+habitflow_data/
+
 # Custom Notes / Artifacts
 CONCEPTS.md
 DEPLOYMENT.md

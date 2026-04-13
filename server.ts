@@ -4,24 +4,20 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pino from 'pino';
+import pinoHttp from 'pino-http';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
-const logger = pino({
-  transport: process.env.NODE_ENV !== 'production' ? {
-    target: 'pino-pretty'
-  } : undefined,
-  level: process.env.LOG_LEVEL || 'info',
-});
+const logger = pino();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbPath = process.env.DB_PATH || 'habits.db';
 const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
 
 // Initialize DB
+db.pragma('journal_mode = WAL');
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -55,26 +51,47 @@ db.exec(`
 try { db.exec("ALTER TABLE users ADD COLUMN ntfyTopic TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE habits ADD COLUMN reminderTime TEXT"); } catch (e) {}
 
+// Daily automated SQLite backup
+setInterval(async () => {
+  try {
+    const backupPath = path.join(path.dirname(dbPath), 'backup.db');
+    await db.backup(backupPath);
+    logger.info(`Automated database backup completed successfully to ${backupPath}`);
+  } catch (err) {
+    logger.error({ err }, 'Failed to run automated database backup');
+  }
+}, 24 * 60 * 60 * 1000);
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(helmet());
-  app.use(express.json());
-
-  app.use('/api/', rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 100,
-    message: { error: 'Too many requests, please try again later.' },
+  // Use Helmet for security headers, but don't block Vite features during Dev
+  app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
   }));
 
+  // Bind structured logging
+  app.use(pinoHttp({ logger }));
+
+  app.use(express.json());
+
+  // Apply rate limiting specifically on backend API routes
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 min
+    max: 150,
+    message: { error: 'Too many requests; please try again later.' }
+  });
+  app.use('/api/', apiLimiter);
+
+  // Healthcheck endpoint for orchestrators (e.g., Docker HEALTHCHECK)
   app.get('/api/health', (req, res) => {
     try {
       db.prepare('SELECT 1').get();
-      res.status(200).send('OK');
-    } catch(e) {
-      logger.error({ err: e }, 'Healthcheck failed');
-      res.status(500).send('Database Error');
+      res.status(200).json({ status: 'ok' });
+    } catch (err) {
+      logger.error({ err }, 'Healthcheck database ping failed');
+      res.status(500).json({ status: 'error', message: 'Database unreachable' });
     }
   });
 
@@ -223,17 +240,6 @@ async function startServer() {
       }
     }
   }, 10000);
-
-  // Background job for SQLite backups
-  setInterval(async () => {
-    try {
-      logger.info('Starting daily database backup...');
-      await db.backup(path.join(path.dirname(dbPath), 'backup.db'));
-      logger.info('Database backup completed successfully');
-    } catch (err) {
-      logger.error({ err }, 'Database backup failed');
-    }
-  }, 24 * 60 * 60 * 1000);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
