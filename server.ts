@@ -68,9 +68,15 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Use Helmet for security headers, but don't block Vite features during Dev
+  // Use Helmet for security headers, but configure for local HTTP-only deployments
   app.use(helmet({
-    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "upgrade-insecure-requests": null,
+      },
+    } : false,
+    hsts: false, // Disable HSTS for local IP deployments without SSL
   }));
 
   // Bind structured logging
