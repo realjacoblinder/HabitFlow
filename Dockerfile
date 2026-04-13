@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 
 # Create app directory and data directory, set ownership
 WORKDIR /app
