@@ -3,6 +3,12 @@ import { createServer as createViteServer } from 'vite';
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import pino from 'pino';
+import pinoHttp from 'pino-http';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
+const logger = pino();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +17,7 @@ const dbPath = process.env.DB_PATH || 'habits.db';
 const db = new Database(dbPath);
 
 // Initialize DB
+db.pragma('journal_mode = WAL');
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -44,11 +51,49 @@ db.exec(`
 try { db.exec("ALTER TABLE users ADD COLUMN ntfyTopic TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE habits ADD COLUMN reminderTime TEXT"); } catch (e) {}
 
+// Daily automated SQLite backup
+setInterval(async () => {
+  try {
+    const backupPath = path.join(path.dirname(dbPath), 'backup.db');
+    await db.backup(backupPath);
+    logger.info(`Automated database backup completed successfully to ${backupPath}`);
+  } catch (err) {
+    logger.error({ err }, 'Failed to run automated database backup');
+  }
+}, 24 * 60 * 60 * 1000);
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Use Helmet for security headers, but don't block Vite features during Dev
+  app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+  }));
+
+  // Bind structured logging
+  app.use(pinoHttp({ logger }));
+
   app.use(express.json());
+
+  // Apply rate limiting specifically on backend API routes
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 min
+    max: 150,
+    message: { error: 'Too many requests; please try again later.' }
+  });
+  app.use('/api/', apiLimiter);
+
+  // Healthcheck endpoint for orchestrators (e.g., Docker HEALTHCHECK)
+  app.get('/api/health', (req, res) => {
+    try {
+      db.prepare('SELECT 1').get();
+      res.status(200).json({ status: 'ok' });
+    } catch (err) {
+      logger.error({ err }, 'Healthcheck database ping failed');
+      res.status(500).json({ status: 'error', message: 'Database unreachable' });
+    }
+  });
 
   // Middleware to extract userId
   app.use((req, res, next) => {
@@ -97,7 +142,7 @@ async function startServer() {
       if (!ntfyRes.ok) throw new Error('NTFY responded with ' + ntfyRes.status);
       res.json({ success: true });
     }).catch(err => {
-      console.error('Test notification failed:', err);
+      logger.error({ err }, 'Test notification failed');
       res.status(500).json({ error: 'Failed to send notification.' });
     });
   });
@@ -188,10 +233,10 @@ async function startServer() {
               'Title': 'HabitFlow Reminder',
               'Tags': 'bell'
             }
-          }).catch(err => console.error('Failed to send ntfy reminder', err));
+          }).catch(err => logger.error({ err }, 'Failed to send ntfy reminder'));
         }
       } catch (err) {
-        console.error('Error checking reminders', err);
+        logger.error({ err }, 'Error checking reminders');
       }
     }
   }, 10000);
@@ -212,7 +257,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    logger.info(`Server running on http://localhost:${PORT}`);
   });
 }
 
