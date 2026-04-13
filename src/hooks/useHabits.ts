@@ -52,7 +52,7 @@ export function useHabits(userId: string | null) {
   }, [userId]);
 
   // Habit Actions
-  const addHabit = async (name: string, frequency: 'daily' | 'weekly' | 'monthly', description?: string, categoryId?: string, reminderTime?: string) => {
+  const addHabit = async (name: string, frequency: 'daily' | 'weekly' | 'monthly', description?: string, categoryId?: string, reminderTime?: string, frequencyTarget?: number) => {
     if (!userId) return;
     const newHabit: Habit = {
       id: uuidv4(),
@@ -60,8 +60,10 @@ export function useHabits(userId: string | null) {
       description,
       categoryId,
       frequency,
+      frequencyTarget,
       createdAt: Date.now(),
       reminderTime,
+      position: habits.length > 0 ? Math.max(...habits.map(h => h.position || 0)) + 1 : 1,
     };
     setHabits([...habits, newHabit]);
     await apiFetch('/api/habits', userId, {
@@ -155,6 +157,19 @@ export function useHabits(userId: string | null) {
     return records.find((r) => r.habitId === habitId && r.date === dateStr);
   };
 
+  const reorderHabits = async (orderedHabits: Habit[]) => {
+    if (!userId) return;
+    const updatedHabits = orderedHabits.map((h, index) => ({ ...h, position: index + 1 }));
+    setHabits(updatedHabits);
+    
+    await apiFetch('/api/reorder-habits', userId, {
+      method: 'PUT',
+      body: JSON.stringify({
+        orders: updatedHabits.map(h => ({ id: h.id, position: h.position }))
+      }),
+    });
+  };
+
   return {
     habits,
     categories,
@@ -167,6 +182,7 @@ export function useHabits(userId: string | null) {
     deleteCategory,
     toggleHabitRecord,
     getHabitRecord,
+    reorderHabits,
     isLoaded
   };
 }

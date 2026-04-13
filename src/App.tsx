@@ -4,7 +4,7 @@ import { CategoryManager } from './components/CategoryManager';
 import { HabitForm } from './components/HabitForm';
 import { HabitList } from './components/HabitList';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
-import { Activity } from 'lucide-react';
+import { Activity, ArrowUpDown } from 'lucide-react';
 import { UserSwitcher } from './components/UserSwitcher';
 import { UserSettingsDialog } from './components/UserSettingsDialog';
 import { User } from './types';
@@ -95,11 +95,13 @@ export default function App() {
     updateCategory,
     deleteCategory,
     toggleHabitRecord,
+    reorderHabits,
     isLoaded
   } = useHabits(currentUserId);
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedFrequency, setSelectedFrequency] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<'manual' | 'category' | 'frequency'>('manual');
 
   if (!isUsersLoaded || (currentUserId && !isLoaded)) {
     return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
@@ -178,7 +180,6 @@ export default function App() {
                 <SelectItem value="monthly">Monthly</SelectItem>
               </SelectContent>
             </Select>
-
             <Select
               value={selectedCategoryId || 'all'}
               onValueChange={(val) => setSelectedCategoryId(val === 'all' ? null : val)}
@@ -200,6 +201,23 @@ export default function App() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Select
+              value={sortMode}
+              onValueChange={(val) => setSortMode(val as any)}
+            >
+              <SelectTrigger className="w-[130px]">
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  <SelectValue placeholder="Sort By" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">Manual</SelectItem>
+                <SelectItem value="category">Category</SelectItem>
+                <SelectItem value="frequency">Frequency</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -212,6 +230,8 @@ export default function App() {
           deleteHabit={deleteHabit}
           selectedCategoryId={selectedCategoryId}
           selectedFrequency={selectedFrequency}
+          sortMode={sortMode}
+          reorderHabits={reorderHabits}
         />
       </main>
     </div>

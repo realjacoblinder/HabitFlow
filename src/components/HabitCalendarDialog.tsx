@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Habit, HabitRecord } from '../types';
+import { Habit, HabitRecord, Category } from '../types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Button } from './ui/button';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Check } from 'lucide-react';
@@ -10,9 +10,11 @@ interface HabitCalendarDialogProps {
   habit: Habit;
   records: HabitRecord[];
   toggleHabitRecord: (habitId: string, date: Date) => void;
+  category?: Category;
+  isHeatmap?: boolean;
 }
 
-export function HabitCalendarDialog({ habit, records, toggleHabitRecord }: HabitCalendarDialogProps) {
+export function HabitCalendarDialog({ habit, records, toggleHabitRecord, category, isHeatmap }: HabitCalendarDialogProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isOpen, setIsOpen] = useState(false);
 
@@ -72,15 +74,20 @@ export function HabitCalendarDialog({ habit, records, toggleHabitRecord }: Habit
                   key={day.toISOString()}
                   onClick={() => toggleHabitRecord(habit.id, day)}
                   className={cn(
-                    "aspect-square flex flex-col items-center justify-center rounded-md text-sm transition-colors relative",
-                    !isCurrentMonth && "text-muted-foreground/30 opacity-50",
-                    isCurrentMonth && !isCompleted && "hover:bg-muted text-foreground",
-                    isCompleted && "bg-primary text-primary-foreground hover:bg-primary/90 font-medium",
+                    "aspect-square flex flex-col items-center justify-center text-sm transition-colors relative",
+                    isHeatmap ? "rounded-sm border border-transparent shadow-[0_0_0_1px_rgba(0,0,0,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]" : "rounded-md",
+                    !isCurrentMonth && "text-muted-foreground/30 opacity-30",
+                    isCurrentMonth && !isCompleted && (isHeatmap ? "bg-muted/60 hover:bg-muted" : "hover:bg-muted text-foreground"),
+                    isCompleted && (category?.color 
+                      ? (isHeatmap ? "hover:brightness-110" : "text-white font-medium hover:opacity-90") 
+                      : (isHeatmap ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20" : "bg-primary text-primary-foreground hover:bg-primary/90 font-medium")),
                     isDayToday && !isCompleted && "border-2 border-primary text-primary font-bold"
                   )}
+                  {...(isCompleted && category?.color ? { style: { backgroundColor: category.color } } : {})}
+                  title={format(day, 'MMM d, yyyy')}
                 >
-                  <span>{format(day, 'd')}</span>
-                  {isCompleted && <Check className="h-3 w-3 absolute bottom-1 opacity-70" />}
+                  {isHeatmap ? null : <span>{format(day, 'd')}</span>}
+                  {!isHeatmap && isCompleted && <Check className="h-3 w-3 absolute bottom-1 opacity-70" />}
                 </button>
               );
             })}

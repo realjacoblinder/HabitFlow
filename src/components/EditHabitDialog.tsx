@@ -19,6 +19,7 @@ export function EditHabitDialog({ habit, categories, updateHabit }: EditHabitDia
   const [description, setDescription] = useState(habit.description || '');
   const [categoryId, setCategoryId] = useState<string>(habit.categoryId || 'none');
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>(habit.frequency || 'daily');
+  const [frequencyTarget, setFrequencyTarget] = useState<number | ''>(habit.frequencyTarget || '');
   const [reminderTime, setReminderTime] = useState(habit.reminderTime || '');
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export function EditHabitDialog({ habit, categories, updateHabit }: EditHabitDia
       setDescription(habit.description || '');
       setCategoryId(habit.categoryId || 'none');
       setFrequency(habit.frequency || 'daily');
+      setFrequencyTarget(habit.frequencyTarget || '');
       setReminderTime(habit.reminderTime || '');
     }
   }, [isOpen, habit]);
@@ -37,6 +39,7 @@ export function EditHabitDialog({ habit, categories, updateHabit }: EditHabitDia
       updateHabit(habit.id, {
         name: name.trim(),
         frequency,
+        frequencyTarget: typeof frequencyTarget === 'number' ? frequencyTarget : undefined,
         description: description.trim() || undefined,
         categoryId: categoryId === 'none' ? undefined : categoryId,
         reminderTime: reminderTime || undefined,
@@ -76,7 +79,10 @@ export function EditHabitDialog({ habit, categories, updateHabit }: EditHabitDia
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`edit-frequency-${habit.id}`}>Frequency</Label>
-            <Select value={frequency} onValueChange={(val: any) => setFrequency(val)}>
+            <Select value={frequency} onValueChange={(val: any) => {
+              setFrequency(val);
+              if (val === 'daily') setFrequencyTarget('');
+            }}>
               <SelectTrigger>
                 <SelectValue placeholder="Select frequency" />
               </SelectTrigger>
@@ -87,6 +93,20 @@ export function EditHabitDialog({ habit, categories, updateHabit }: EditHabitDia
               </SelectContent>
             </Select>
           </div>
+          {frequency !== 'daily' && (
+            <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
+              <Label htmlFor={`edit-frequency-target-[id]`}>Target Frequency (Days/{frequency === 'weekly' ? 'Week' : 'Month'})</Label>
+              <Input
+                id={`edit-frequency-target-${habit.id}`}
+                type="number"
+                min="1"
+                max={frequency === 'weekly' ? 7 : 31}
+                value={frequencyTarget}
+                onChange={(e) => setFrequencyTarget(e.target.value === '' ? '' : parseInt(e.target.value))}
+                placeholder={`e.g., target amount of days...`}
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             <Label htmlFor={`edit-category-${habit.id}`}>Category</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>

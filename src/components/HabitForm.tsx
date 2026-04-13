@@ -9,7 +9,7 @@ import { Plus } from 'lucide-react';
 
 interface HabitFormProps {
   categories: Category[];
-  addHabit: (name: string, frequency: 'daily' | 'weekly' | 'monthly', description?: string, categoryId?: string, reminderTime?: string) => void;
+  addHabit: (name: string, frequency: 'daily' | 'weekly' | 'monthly', description?: string, categoryId?: string, reminderTime?: string, frequencyTarget?: number) => void;
   addCategory?: (name: string, color: string) => Promise<string | undefined> | undefined;
 }
 
@@ -19,6 +19,7 @@ export function HabitForm({ categories, addHabit, addCategory }: HabitFormProps)
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState<string>('none');
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [frequencyTarget, setFrequencyTarget] = useState<number | ''>('');
   const [reminderTime, setReminderTime] = useState('');
   
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
@@ -28,11 +29,13 @@ export function HabitForm({ categories, addHabit, addCategory }: HabitFormProps)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      addHabit(name.trim(), frequency, description.trim(), categoryId === 'none' ? undefined : categoryId, reminderTime || undefined);
+      const target = typeof frequencyTarget === 'number' ? frequencyTarget : undefined;
+      addHabit(name.trim(), frequency, description.trim(), categoryId === 'none' ? undefined : categoryId, reminderTime || undefined, target);
       setName('');
       setDescription('');
       setCategoryId('none');
       setFrequency('daily');
+      setFrequencyTarget('');
       setReminderTime('');
       setIsCreatingCategory(false);
       setNewCategoryName('');
@@ -71,7 +74,10 @@ export function HabitForm({ categories, addHabit, addCategory }: HabitFormProps)
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="frequency">Frequency</Label>
-            <Select value={frequency} onValueChange={(val: any) => setFrequency(val)}>
+            <Select value={frequency} onValueChange={(val: any) => {
+              setFrequency(val);
+              if (val === 'daily') setFrequencyTarget('');
+            }}>
               <SelectTrigger>
                 <SelectValue placeholder="Select frequency" />
               </SelectTrigger>
@@ -82,6 +88,20 @@ export function HabitForm({ categories, addHabit, addCategory }: HabitFormProps)
               </SelectContent>
             </Select>
           </div>
+          {frequency !== 'daily' && (
+            <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
+              <Label htmlFor="frequency-target">Target Frequency (Days/{frequency === 'weekly' ? 'Week' : 'Month'})</Label>
+              <Input
+                id="frequency-target"
+                type="number"
+                min="1"
+                max={frequency === 'weekly' ? 7 : 31}
+                value={frequencyTarget}
+                onChange={(e) => setFrequencyTarget(e.target.value === '' ? '' : parseInt(e.target.value))}
+                placeholder={`e.g., target amount of days...`}
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             <Label htmlFor="category">Category</Label>
             <Select value={categoryId} onValueChange={(val) => {
