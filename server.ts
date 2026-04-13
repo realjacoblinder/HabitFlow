@@ -36,7 +36,8 @@ db.exec(`
     description TEXT,
     categoryId TEXT,
     frequency TEXT,
-    createdAt INTEGER
+    createdAt INTEGER,
+    position INTEGER DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS records (
     habitId TEXT,
@@ -50,6 +51,7 @@ db.exec(`
 try { db.exec("ALTER TABLE users ADD COLUMN ntfyTopic TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE habits ADD COLUMN reminderTime TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE habits ADD COLUMN frequencyTarget INTEGER"); } catch (e) {}
+try { db.exec("ALTER TABLE habits ADD COLUMN position INTEGER DEFAULT 0"); } catch (e) {}
 
 // Daily automated SQLite backup
 setInterval(async () => {
@@ -151,7 +153,7 @@ async function startServer() {
   app.get('/api/data', (req, res) => {
     const userId = res.locals.userId;
     const categories = db.prepare('SELECT * FROM categories WHERE userId = ?').all(userId);
-    const habits = db.prepare('SELECT * FROM habits WHERE userId = ?').all(userId);
+    const habits = db.prepare('SELECT * FROM habits WHERE userId = ? ORDER BY position ASC, createdAt ASC').all(userId);
     const records = db.prepare('SELECT * FROM records WHERE userId = ?').all(userId).map((r: any) => ({
       ...r,
       completed: r.completed === 1
@@ -179,8 +181,11 @@ async function startServer() {
   // Habits
   app.post('/api/habits', (req, res) => {
     const { id, name, description, categoryId, frequency, createdAt, reminderTime, frequencyTarget } = req.body;
-    db.prepare('INSERT INTO habits (id, userId, name, description, categoryId, frequency, createdAt, reminderTime, frequencyTarget) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-      id, res.locals.userId, name, description || null, categoryId || null, frequency || 'daily', createdAt, reminderTime || null, frequencyTarget || null
+    const maxPos = db.prepare('SELECT MAX(position) as maxPos FROM habits WHERE userId = ?').get(res.locals.userId) as { maxPos: number | null };
+    const position = (maxPos?.maxPos || 0) + 1;
+    
+    db.prepare('INSERT INTO habits (id, userId, name, description, categoryId, frequency, createdAt, reminderTime, frequencyTarget, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+      id, res.locals.userId, name, description || null, categoryId || null, frequency || 'daily', createdAt, reminderTime || null, frequencyTarget || null, position
     );
     res.json({ success: true });
   });
@@ -194,6 +199,18 @@ async function startServer() {
   app.delete('/api/habits/:id', (req, res) => {
     db.prepare('DELETE FROM habits WHERE id = ? AND userId = ?').run(req.params.id, res.locals.userId);
     db.prepare('DELETE FROM records WHERE habitId = ? AND userId = ?').run(req.params.id, res.locals.userId);
+    res.json({ success: true });
+  });
+
+  app.put('/api/reorder-habits', (req, res) => {
+    const { orders } = req.body;
+    const update = db.prepare('UPDATE habits SET position = ? WHERE id = ? AND userId = ?');
+    const transaction = db.transaction((data) => {
+      for (const item of data) {
+        update.run(item.position, item.id, res.locals.userId);
+      }
+    });
+    transaction(orders);
     res.json({ success: true });
   });
 
