@@ -113,8 +113,8 @@ export function HabitList({ habits, categories, records, toggleHabitRecord, upda
 
 
   const isPeriodMet = (habitId: string, frequency: string, target: number, date: Date) => {
-    const start = frequency === 'weekly' ? startOfWeek(date, { weekStartsOn: 1 }) : startOfMonth(date);
-    const end = frequency === 'weekly' ? endOfWeek(date, { weekStartsOn: 1 }) : endOfMonth(date);
+    const start = frequency === 'weekly' ? startOfWeek(date, { weekStartsOn: 0 }) : startOfMonth(date);
+    const end = frequency === 'weekly' ? endOfWeek(date, { weekStartsOn: 0 }) : endOfMonth(date);
     
     return records.filter(r => {
       if (r.habitId !== habitId || !r.completed) return false;
@@ -219,7 +219,7 @@ export function HabitList({ habits, categories, records, toggleHabitRecord, upda
     habitRecords.forEach(r => {
       const [y, m, d] = r.date.split('-');
       const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-      const start = frequency === 'weekly' ? startOfWeek(dateObj, { weekStartsOn: 1 }) : startOfMonth(dateObj);
+      const start = frequency === 'weekly' ? startOfWeek(dateObj, { weekStartsOn: 0 }) : startOfMonth(dateObj);
       periodStarts.add(start.toISOString());
     });
 
@@ -239,7 +239,7 @@ export function HabitList({ habits, categories, records, toggleHabitRecord, upda
       
       const expectedPrev = frequency === 'weekly' ? subWeeks(curr, 1) : subMonths(curr, 1);
       const isConsecutive = frequency === 'weekly' 
-        ? isSameWeek(prev, expectedPrev, { weekStartsOn: 1 })
+        ? isSameWeek(prev, expectedPrev, { weekStartsOn: 0 })
         : isSameMonth(prev, expectedPrev);
 
       if (isConsecutive) {
@@ -303,6 +303,7 @@ export function HabitList({ habits, categories, records, toggleHabitRecord, upda
 }
 
 interface SortableHabitItemProps {
+  key?: React.Key;
   habit: Habit;
   index: number;
   total: number;
@@ -489,7 +490,7 @@ function SortableHabitItem({
                 const [y, m, d] = r.date.split('-');
                 const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
                 return habit.frequency === 'weekly'
-                  ? isSameWeek(dateObj, today, { weekStartsOn: 1 })
+                  ? isSameWeek(dateObj, today, { weekStartsOn: 0 })
                   : isSameMonth(dateObj, today);
               }).length;
 
@@ -505,7 +506,7 @@ function SortableHabitItem({
 
               // Days Left Math
               const targetDate =
-                habit.frequency === 'weekly' ? endOfWeek(today, { weekStartsOn: 1 }) : endOfMonth(today);
+                habit.frequency === 'weekly' ? endOfWeek(today, { weekStartsOn: 0 }) : endOfMonth(today);
               const daysLeft = differenceInDays(targetDate, today) + 1;
 
               let daysLeftColor = 'text-green-600 dark:text-green-400';
