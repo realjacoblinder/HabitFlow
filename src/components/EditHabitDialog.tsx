@@ -109,7 +109,7 @@ export function EditHabitDialog({ habit, categories, updateHabit }: EditHabitDia
           )}
           <div className="flex flex-col gap-2">
             <Label htmlFor={`edit-category-${habit.id}`}>Category</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
+            <Select value={categoryId} onValueChange={(val) => setCategoryId(val || 'none')}>
               <SelectTrigger>
                 <SelectValue>
                   {categoryId === 'none' ? 'No Category' : categories.find(c => c.id === categoryId)?.name || 'Select a category'}

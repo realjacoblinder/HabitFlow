@@ -38,7 +38,7 @@ export function UserSwitcher({ users, currentUserId, onSwitchUser, onCreateUser 
             if (val === 'new') {
               setIsOpen(true);
             } else {
-              onSwitchUser(val);
+              if (val) onSwitchUser(val);
             }
           }}
         >

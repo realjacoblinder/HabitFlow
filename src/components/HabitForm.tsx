@@ -110,7 +110,7 @@ export function HabitForm({ categories, addHabit, addCategory }: HabitFormProps)
                 setCategoryId('none');
               } else {
                 setIsCreatingCategory(false);
-                setCategoryId(val);
+                setCategoryId(val || 'none');
               }
             }}>
               <SelectTrigger>
