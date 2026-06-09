@@ -13,3 +13,7 @@ habitflow_data/
 # Custom Notes / Artifacts
 NOODLING.md
 BUGS.MD
+
+habits.db
+habits.db-shm
+habits.db-wal

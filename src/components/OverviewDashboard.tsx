@@ -2,7 +2,7 @@ import React from 'react';
 import { Habit, Category, HabitRecord } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { calculateHabitStats, getHeatmapData, getCompletedDates } from '../lib/stats';
+import { calculateHabitStats, getHeatmapData, getCompletedDates, HeatmapDay } from '../lib/stats';
 import { Flame, CheckCircle2, TrendingUp, Calendar, Trophy, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -55,7 +55,7 @@ export function OverviewDashboard({ habits, categories, records, onBackToList }:
   const heatmapData = getHeatmapData(records, 139);
   
   // Group days into columns of 7 (weeks)
-  const weeks = [];
+  const weeks: HeatmapDay[][] = [];
   for (let i = 0; i < heatmapData.length; i += 7) {
     weeks.push(heatmapData.slice(i, i + 7));
   }
