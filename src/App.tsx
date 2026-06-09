@@ -9,6 +9,7 @@ import { UserSwitcher } from './components/UserSwitcher';
 import { UserSettingsDialog } from './components/UserSettingsDialog';
 import { User } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { OverviewDashboard } from './components/OverviewDashboard';
 
 export default function App() {
   const [users, setUsers] = useState<User[]>([]);
@@ -102,6 +103,7 @@ export default function App() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedFrequency, setSelectedFrequency] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'manual' | 'category' | 'frequency'>('manual');
+  const [view, setView] = useState<'list' | 'overview'>('list');
 
   if (!isUsersLoaded || (currentUserId && !isLoaded)) {
     return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
@@ -159,80 +161,115 @@ export default function App() {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-5xl">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Your Habits</h2>
-            <p className="text-muted-foreground mt-1">Track your daily progress and build consistency.</p>
-          </div>
-          
-          <div className="flex w-full sm:w-auto gap-2">
-            <Select
-              value={selectedFrequency || 'all'}
-              onValueChange={(val) => setSelectedFrequency(val === 'all' ? null : val)}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="All Frequencies" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Frequencies</SelectItem>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={selectedCategoryId || 'all'}
-              onValueChange={(val) => setSelectedCategoryId(val === 'all' ? null : val)}
-            >
-              <SelectTrigger className="w-[160px]">
-                <SelectValue>
-                  {selectedCategoryId ? categories.find(c => c.id === selectedCategoryId)?.name || 'All Categories' : 'All Categories'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }} />
-                      {c.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={sortMode}
-              onValueChange={(val) => setSortMode(val as any)}
-            >
-              <SelectTrigger className="w-[130px]">
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  <SelectValue placeholder="Sort By" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manual">Manual</SelectItem>
-                <SelectItem value="category">Category</SelectItem>
-                <SelectItem value="frequency">Frequency</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Navigation Tabs */}
+        <div className="flex border-b mb-8 gap-4">
+          <button
+            onClick={() => setView('list')}
+            className={`px-4 py-2 font-medium text-sm border-b-2 -mb-[2px] transition-all cursor-pointer ${
+              view === 'list'
+                ? 'border-primary text-primary font-semibold'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            My Tracker
+          </button>
+          <button
+            onClick={() => setView('overview')}
+            className={`px-4 py-2 font-medium text-sm border-b-2 -mb-[2px] transition-all cursor-pointer ${
+              view === 'overview'
+                ? 'border-primary text-primary font-semibold'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Consistency Overview
+          </button>
         </div>
 
-        <HabitList
-          habits={habits}
-          categories={categories}
-          records={records}
-          toggleHabitRecord={toggleHabitRecord}
-          updateHabit={updateHabit}
-          deleteHabit={deleteHabit}
-          selectedCategoryId={selectedCategoryId}
-          selectedFrequency={selectedFrequency}
-          sortMode={sortMode}
-          reorderHabits={reorderHabits}
-        />
+        {view === 'list' ? (
+          <>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+              <div>
+                <h2 className="text-3xl font-bold tracking-tight">Your Habits</h2>
+                <p className="text-muted-foreground mt-1">Track your daily progress and build consistency.</p>
+              </div>
+              
+              <div className="flex w-full sm:w-auto gap-2">
+                <Select
+                  value={selectedFrequency || 'all'}
+                  onValueChange={(val) => setSelectedFrequency(val === 'all' ? null : val)}
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="All Frequencies" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Frequencies</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={selectedCategoryId || 'all'}
+                  onValueChange={(val) => setSelectedCategoryId(val === 'all' ? null : val)}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue>
+                      {selectedCategoryId ? categories.find(c => c.id === selectedCategoryId)?.name || 'All Categories' : 'All Categories'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }} />
+                          {c.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={sortMode}
+                  onValueChange={(val) => setSortMode(val as any)}
+                >
+                  <SelectTrigger className="w-[130px]">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      <SelectValue placeholder="Sort By" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="category">Category</SelectItem>
+                    <SelectItem value="frequency">Frequency</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <HabitList
+              habits={habits}
+              categories={categories}
+              records={records}
+              toggleHabitRecord={toggleHabitRecord}
+              updateHabit={updateHabit}
+              deleteHabit={deleteHabit}
+              selectedCategoryId={selectedCategoryId}
+              selectedFrequency={selectedFrequency}
+              sortMode={sortMode}
+              reorderHabits={reorderHabits}
+            />
+          </>
+        ) : (
+          <OverviewDashboard
+            habits={habits}
+            categories={categories}
+            records={records}
+            onBackToList={() => setView('list')}
+          />
+        )}
       </main>
     </div>
   );
