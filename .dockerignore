@@ -4,3 +4,5 @@ dist
 .env
 habits.db
 habits.db-journal
+habits.db-shm
+habits.db-wal
